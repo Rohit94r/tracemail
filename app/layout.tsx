@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
-import { Inter_Tight } from "next/font/google";
+import { Anton, Inter_Tight } from "next/font/google";
 import "./globals.css";
 
 const interTight = Inter_Tight({
   variable: "--font-inter-tight",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+const anton = Anton({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -30,7 +37,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${interTight.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${interTight.variable} ${anton.variable} h-full antialiased`}
+    >
       <body className="min-h-screen bg-surface text-heading font-sans selection:bg-primary/20 selection:text-primary">
         {children}
       </body>

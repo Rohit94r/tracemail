@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { RavenWordmark } from "./RavenWordmark";
 
 export function Footer() {
   return (
@@ -46,14 +47,6 @@ export function Footer() {
                     href="#problem"
                   >
                     The Problem
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="text-base text-white/70 transition-colors hover:text-white"
-                    href="#capabilities"
-                  >
-                    Core Capabilities
                   </a>
                 </li>
                 <li>
@@ -177,31 +170,9 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Giant Typography Background Wordmark */}
-      <div className="mx-auto max-w-7xl p-2">
-        <div className="relative overflow-hidden p-2 text-center">
-          <span
-            aria-hidden="true"
-            className="block w-full select-none text-center font-black tracking-widest leading-[0.85]"
-            style={{
-              fontSize: "clamp(40px, 20vw, 240px)",
-              background: "linear-gradient(90deg, #2563eb 0%, #38bdf8 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            RAVEN
-          </span>
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(12,12,12,0) 0%, rgba(12, 12, 12, 0.67) 50%, rgba(12,12,12,1) 100%)",
-            }}
-          />
-        </div>
+      {/* Giant Typography Wordmark */}
+      <div className="pb-6">
+        <RavenWordmark />
       </div>
     </footer>
   );

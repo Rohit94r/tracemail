@@ -4,7 +4,6 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Button } from "./Button";
-import { RavenDashboardPreview } from "./RavenDashboardPreview";
 
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
@@ -99,7 +98,14 @@ export function Hero() {
             }}
             className="rounded-[20px] md:rounded-[28px] border border-white/50 bg-white/30 p-2 md:p-5 shadow-[0_40px_100px_-30px_rgba(12,12,12,0.15)] backdrop-blur-md"
           >
-            <RavenDashboardPreview />
+            <Image
+              src="/hero.png"
+              alt="Raven posture dashboard — Grade B+ score, weakest-hop pinpointing, and audit-ready forensic findings"
+              width={1531}
+              height={1027}
+              priority
+              className="h-auto w-full rounded-lg md:rounded-xl"
+            />
           </motion.div>
         </div>
       </div>

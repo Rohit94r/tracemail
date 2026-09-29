@@ -51,27 +51,6 @@ export function TestimonialsSection() {
     <section className="bg-surface-soft py-14 md:py-26">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-center">
-          <span className="inline-flex items-center gap-2 rounded-pill bg-primary-soft px-4 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-primary">
-            <svg
-              aria-hidden="true"
-              className="lucide lucide-sparkles h-3.5 w-3.5"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.5"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-              <path d="M20 2v4" />
-              <path d="M22 4h-4" />
-              <circle cx="4" cy="20" r="2" />
-            </svg>
-            Practitioner Verification
-          </span>
           <h2 className="mt-7 max-w-2xl text-center text-[40px] font-semibold leading-[1.1] tracking-[-0.03em] text-heading md:text-6xl">
             Validated by <span className="text-primary">Security Teams</span>
             <br className="hidden md:block" /> & Forensics Leads
