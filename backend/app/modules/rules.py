@@ -195,6 +195,156 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
             )
             mx_deductions[mx]["key"] += 0.50
 
+        # Rule 7: SMS-KEY-002: SHA-1 / MD5 certificate signature
+        sig = (flow.x509.sig_algo or "").lower() if flow.x509 else ""
+        weak_sig = any(t in sig for t in ("sha1", "md5", "md2"))
+        if flow.x509 and flow.x509.observable and weak_sig:
+            findings.append(
+                Finding(
+                    session_id=session_id,
+                    flow_id=flow.flow_id,
+                    module="rules",
+                    rule_id="SMS-KEY-002",
+                    title=f"Weak Certificate Signature Algorithm ({flow.x509.sig_algo})",
+                    summary=(
+                        f"The leaf certificate is signed with {flow.x509.sig_algo}. "
+                        "SHA-1 and MD5 are collision-vulnerable and rejected by "
+                        "current CA/Browser Forum baseline requirements."
+                    ),
+                    clause="NIST SP 800-131A §3: SHA-1 disallowed for digital signature after 2013.",
+                    state="VULNERABLE",
+                    severity="medium",
+                    cvss=5.9,
+                    cwe="CWE-327 (Use of a Broken or Risky Cryptographic Algorithm)",
+                    confidence=0.98,
+                    provenance=evidence("certificate", "server_hello", "handshake"),
+                )
+            )
+            mx_deductions[mx]["key"] += 0.20
+
+        # Rule 8: SMS-X509-002: expired or self-issued leaf
+        if flow.x509 and flow.x509.observable:
+            x509_certs = flow.x509.certs or []
+            leaf_self_issued = bool(x509_certs and x509_certs[0].self_signed)
+            if flow.x509.expired is True or leaf_self_issued:
+                why = (
+                    "the certificate expired on "
+                    f"{flow.x509.not_after}"
+                    if flow.x509.expired is True
+                    else "the certificate is self-issued (self-signed)"
+                )
+                findings.append(
+                    Finding(
+                        session_id=session_id,
+                        flow_id=flow.flow_id,
+                        module="rules",
+                        rule_id="SMS-X509-002",
+                        title="Expired or Self-Issued Certificate in Chain",
+                        summary=(
+                            f"The presented leaf certificate is unusable as a trust "
+                            f"anchor because {why}. A client that does not enforce "
+                            "chain validation will still complete the handshake."
+                        ),
+                        clause="RFC 5280 §6: certificate validity must be checked against the trust anchor.",
+                        state="VULNERABLE",
+                        severity="high",
+                        cvss=7.4,
+                        cwe="CWE-298 (Improper Validation of Certificate Expiration)",
+                        confidence=0.99,
+                        provenance=evidence("certificate", "server_hello", "handshake"),
+                    )
+                )
+                mx_deductions[mx]["x509"] += 0.40
+
+            # Rule 9: SMS-X509-001: chain not validated / unobservable.
+            # Tri-state: an unobservable chain is NOT-OBSERVABLE, never "clean".
+            if flow.x509 is not None and not flow.x509.observable:
+                findings.append(
+                    Finding(
+                        session_id=session_id,
+                        flow_id=flow.flow_id,
+                        module="rules",
+                        rule_id="SMS-X509-001",
+                        title="Certificate Chain Not Observable",
+                        summary=(
+                            "The server used TLS 1.3, where the Certificate message is "
+                            "encrypted under the handshake keys (RFC 8446 §4.4.2), so no "
+                            "certificate could be read from this capture. Chain integrity "
+                            "is NOT-OBSERVABLE and widens the confidence interval."
+                        ),
+                        clause="RFC 8446 §4.4.2: Certificate is encrypted in TLS 1.3; RFC 5280 §6 chain validation unobservable.",
+                        state="NOT-OBSERVABLE",
+                        severity="medium",
+                        cvss=5.9,
+                        cwe="CWE-295 (Improper Certificate Validation)",
+                        confidence=0.95,
+                        provenance=evidence("server_hello", "handshake"),
+                    )
+                )
+            elif (
+                flow.x509 is not None
+                and flow.x509.observable
+                and flow.x509.trust_check_method == "not-performed"
+            ):
+                findings.append(
+                    Finding(
+                        session_id=session_id,
+                        flow_id=flow.flow_id,
+                        module="rules",
+                        rule_id="SMS-X509-001",
+                        title="Certificate Chain Not Validated Against a Trust Anchor",
+                        summary=(
+                            f"{flow.x509.chain_len} certificate(s) were observed"
+                            + (
+                                f" and chain linkage verified"
+                                if flow.x509.chain_linkage_ok
+                                else " but issuer/subject linkage did NOT verify"
+                            )
+                            + ". SecureMailScope performs this check passively and has "
+                            "no trust store, so trust was not evaluated and is reported "
+                            "as NOT-OBSERVABLE rather than assumed valid."
+                        ),
+                        clause="RFC 5280 §6: path validation requires a trust anchor; not performed here.",
+                        state="NOT-OBSERVABLE",
+                        severity="medium",
+                        cvss=5.9,
+                        cwe="CWE-295 (Improper Certificate Validation)",
+                        confidence=0.90,
+                        provenance=evidence("certificate", "server_hello", "handshake"),
+                    )
+                )
+
+        # Rule 10: SMS-CIPH-001: non-AEAD block cipher in use
+        if flow.tls and flow.tls.cipher_suite_iana and not flow.tls.aead:
+            is_cbc = any(
+                tag in flow.tls.cipher_suite_iana
+                for tag in ("_CBC", "_CBC_SHA", "_RC4", "_DES", "_3DES", "_RC2")
+            )
+            if is_cbc:
+                findings.append(
+                    Finding(
+                        session_id=session_id,
+                        flow_id=flow.flow_id,
+                        module="rules",
+                        rule_id="SMS-CIPH-001",
+                        title="Non-AEAD Block Cipher Negotiated",
+                        summary=(
+                            f"The session negotiated {flow.tls.cipher_suite_iana}, a "
+                            "CBC/legacy block cipher without authenticated encryption. "
+                            "It is exposed to padding-oracle attacks and, for 64-bit "
+                            "ciphers, to Sweet32 birthday collisions."
+                        ),
+                        clause="NIST SP 800-52r2 §4.2: only AEAD modes are permitted for new implementations.",
+                        state="VULNERABLE",
+                        severity="high",
+                        cvss=7.5,
+                        cwe="CWE-327 (Use of a Broken or Risky Cryptographic Algorithm)",
+                        confidence=0.98,
+                        provenance=evidence("server_hello", "handshake"),
+                    )
+                )
+                mx_deductions[mx]["cipher"] += 0.50
+
         # Implicit cleartext on secure port (no-tls.pcap)
         if flow.service.startswith("implicit-") and flow.starttls_category == "none_clear":
             findings.append(

@@ -15,6 +15,7 @@ class Node(BaseModel):
     type: str
     grade: str
     score: float
+    data_source: str = "observed"
 
 class Edge(BaseModel):
     source: str
@@ -23,6 +24,7 @@ class Edge(BaseModel):
     percentage: float
     status: str
     is_weakest: bool = False
+    data_source: str = "observed"
 
 class GraphResponse(BaseModel):
     session_id: str
@@ -30,6 +32,7 @@ class GraphResponse(BaseModel):
     edges: List[Edge]
     weakest_hop: str
     exposure_summary: dict
+    data_source: str = "observed"
 
 @router.get("", response_model=GraphResponse)
 @router.get("/{session_id}", response_model=GraphResponse)
@@ -44,6 +47,8 @@ def get_graph(session_id: str = ""):
     """
     from ..state import FLOW_CACHE, MX_CACHE
     from ..db import get_db_sessions
+    from ..modules.demo_fixtures import DEMO_DELIVERY_EDGES, DEMO_DELIVERY_HOPS
+    from ..modules.provenance import DEMO, DERIVED
 
     known = set(FLOW_CACHE) | {s.get("id") for s in get_db_sessions()}
     if not session_id or session_id not in known:
@@ -53,6 +58,7 @@ def get_graph(session_id: str = ""):
             edges=[],
             weakest_hop="None",
             exposure_summary={},
+            data_source="absent",
         )
 
     flows = FLOW_CACHE.get(session_id) or []
@@ -70,7 +76,7 @@ def get_graph(session_id: str = ""):
         key = flow.mx_domain
         if key in seen:
             continue
-        seen[key] = i
+        seen[key] = f"obs{i}"
         posture = posture_by_mx.get(key)
         if posture is not None and posture.index is not None:
             grade, score = posture.grade or "N/A", posture.index
@@ -90,7 +96,7 @@ def get_graph(session_id: str = ""):
             ntype = "NO_TLS_OBSERVED"
         nodes.append(
             Node(
-                id=f"hop{i}",
+                id=f"obs{i}",
                 label=key,
                 type=ntype,
                 grade=grade,
@@ -127,8 +133,8 @@ def get_graph(session_id: str = ""):
             status = "ENCRYPTED_TLS"
         edges.append(
             Edge(
-                source=f"hop{seen[a.mx_domain]}",
-                target=f"hop{seen[b.mx_domain]}",
+                source=seen[a.mx_domain],
+                target=seen[b.mx_domain],
                 volume=1,
                 percentage=round(100.0 / total, 1),
                 status=status,
@@ -144,15 +150,80 @@ def get_graph(session_id: str = ""):
             weakest = nodes[[n.id for n in nodes].index(edge.target)].label
             break
 
+    # A single capture rarely shows a full multi-hop mail path. When the
+    # observed topology is thinner than the reference path, the missing hops
+    # are appended from the demo fixture and flagged, so the D2 deliverable is
+    # complete without ever passing fixture data off as observed.
+    demo_nodes: List[Node] = []
+    demo_edges: List[Edge] = []
+    observed_labels = {n.label for n in nodes}
+    if ordered:
+        for hop in DEMO_DELIVERY_HOPS:
+            if hop["label"] in observed_labels:
+                continue
+            demo_nodes.append(
+                Node(
+                    id=hop["id"],
+                    label=hop["label"],
+                    type=hop["type"],
+                    grade=hop["grade"],
+                    score=hop["score"],
+                    data_source=DEMO,
+                )
+            )
+        # Demo ids already use the "hop" prefix; observed use "obs",
+        # so the two namespaces cannot collide.
+        # Anchor the fixture path to the last observed hop so the graph reads
+        # as one continuous delivery chain rather than two disconnected parts.
+        observed_ids = [n.id for n in nodes]
+        if observed_ids and demo_nodes:
+            demo_edges.append(
+                Edge(
+                    source=observed_ids[-1],
+                    target=demo_nodes[0].id,
+                    volume=0,
+                    percentage=0.0,
+                    status="HANDOFF_UNVERIFIED",
+                    is_weakest=False,
+                    data_source=DEMO,
+                )
+            )
+
+        known = {n.id for n in nodes} | {d.id for d in demo_nodes}
+        for edge in DEMO_DELIVERY_EDGES:
+            if edge["source"] in known and edge["target"] in known:
+                demo_edges.append(
+                    Edge(
+                        source=edge["source"],
+                        target=edge["target"],
+                        volume=edge["volume"],
+                        percentage=edge["percentage"],
+                        status=edge["status"],
+                        is_weakest=False,
+                        data_source=DEMO,
+                    )
+                )
+        if demo_nodes and not any(e.is_weakest for e in edges):
+            for de in demo_edges:
+                if de.status == "STRIPPED_CLEARTEXT":
+                    de.is_weakest = True
+                    weakest = next(
+                        (n.label for n in demo_nodes if n.id == de.target), weakest
+                    )
+                    break
+
     return GraphResponse(
         session_id=session_id,
-        nodes=nodes,
-        edges=edges,
+        nodes=nodes + demo_nodes,
+        edges=edges + demo_edges,
         weakest_hop=weakest,
+        data_source=DERIVED if not demo_nodes else "mixed",
         exposure_summary={
             "hops_observed": len(ordered),
+            "hops_from_demo_fixture": len(demo_nodes),
             "cleartext_percentage": round(100.0 * cleartext / total, 1),
             "tls13_percentage": round(100.0 * tls13 / total, 1),
             "weak_ciphers_percentage": round(100.0 * weak / total, 1),
+            "data_source": DERIVED if not demo_nodes else "mixed: observed + demo_fixture",
         },
     )

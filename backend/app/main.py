@@ -10,7 +10,7 @@ import asyncio
 import os
 
 from .db import init_db
-from .api import health, captures, mx, graph, findings, reports, ask, lens, integrity
+from .api import health, captures, mx, graph, findings, reports, ask, lens, integrity, dns
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,6 +54,7 @@ app.include_router(reports.router)
 app.include_router(ask.router)
 app.include_router(lens.router)
 app.include_router(integrity.router)
+app.include_router(dns.router)
 
 @app.websocket("/ws/live")
 async def websocket_live_feed(websocket: WebSocket):

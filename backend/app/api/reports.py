@@ -1,67 +1,92 @@
 """
-SIH26159 SecureMailScope — Reports & Remediation API
-Court-grade seals, JSON/HTML exports, and vendor playbook generation per docs/04 §2.
+SIH26159 SecureMailScope — Reports & Remediation API.
+
+Serves the JSON / HTML / PDF renderings of the canonical report document, its
+content-addressed SHA-256 seal, and rule-driven remediation playbooks.
 """
 
-import hashlib
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse, Response
+
 from ..config import PACKAGE_VER
+from ..modules.demo_fixtures import PLAYBOOK
+from ..modules.report_builder import (
+    build_report,
+    render_html,
+    render_pdf,
+    verify_report_hash,
+)
+from ..state import FINDINGS_CACHE
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
+
 @router.get("/{session_id}.json")
 def get_report_json(session_id: str):
-    return {
-        "session_id": session_id,
-        "package_ver": PACKAGE_VER,
-        "report_sha256": hashlib.sha256(f"report_{session_id}_{PACKAGE_VER}".encode()).hexdigest(),
-        "audit_timestamp": "2026-09-29 12:00:00 UTC",
-        "air_gapped": True,
-        "overall_posture": 78.0,
-        "grade": "Grade B+",
-        "ci_range": [71.0, 84.0],
-    }
+    """Canonical report document, including its content-addressed seal."""
+    return build_report(session_id)
+
 
 @router.get("/{session_id}.html", response_class=HTMLResponse)
 def get_report_html(session_id: str):
-    return f"""<!DOCTYPE html>
-<html>
-<head><title>Raven Forensic Audit - {session_id}</title></head>
-<body style="font-family: monospace; padding: 40px; background: #0b0f19; color: #f8fafc;">
-    <h1 style="color: #3b82f6;">RAVEN // SECUREMAILSCOPE AUDIT REPORT</h1>
-    <p>Session ID: {session_id}</p>
-    <p>Package Version: {PACKAGE_VER}</p>
-    <p>Report SHA-256 Seal: {hashlib.sha256(session_id.encode()).hexdigest()}</p>
-    <hr/>
-    <h3>VERDICT: GRADE B+ (78/100) [CI: 71.0–84.0]</h3>
-</body>
-</html>"""
+    return render_html(build_report(session_id))
+
+
+@router.get("/{session_id}.pdf")
+def get_report_pdf(session_id: str) -> Response:
+    """PDF export, sealed with the same content hash as the JSON/HTML."""
+    report = build_report(session_id)
+    pdf = render_pdf(report)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="securemailscope-{session_id}.pdf"'
+            ),
+            "X-Content-SHA256": report["content_sha256"],
+        },
+    )
+
 
 @router.get("/{session_id}/hash")
 def get_report_hash(session_id: str):
+    report = build_report(session_id)
     return {
         "session_id": session_id,
-        "sha256": hashlib.sha256(f"report_{session_id}_{PACKAGE_VER}".encode()).hexdigest(),
+        "sha256": report["content_sha256"],
+        "content_sha256": report["content_sha256"],
         "package_ver": PACKAGE_VER,
+        "algorithm": "SHA-256 over canonical JSON report body",
+        "verified": verify_report_hash(report),
+        "seal_scope": "json+html+pdf",
     }
+
 
 @router.post("/{session_id}/playbook")
 def generate_playbook(session_id: str):
+    """
+    Remediation directives for the rules this session actually triggered,
+    plus the full catalog so the deliverable is never empty.
+    """
+    report = build_report(session_id)
+    triggered = {f["rule_id"] for f in report.get("findings", [])}
+
+    directives = [
+        {
+            "rule_id": rule_id,
+            "mta": entry["mta"],
+            "directive": entry["directive"],
+            "action": entry["action"],
+            "triggered_in_session": rule_id in triggered,
+        }
+        for rule_id, entry in PLAYBOOK.items()
+    ]
     return {
         "session_id": session_id,
-        "remediation_directives": [
-            {
-                "mta": "postfix",
-                "directive": "smtp_tls_security_level = dane",
-                "rule_id": "SMS-ENF-002",
-                "action": "Enforce mandatory TLS with DANE verification to block cleartext stripping.",
-            },
-            {
-                "mta": "postfix",
-                "directive": "smtpd_tls_exclude_ciphers = 3DES, DES, RC4, MD5, aNULL",
-                "rule_id": "SMS-CIPH-001",
-                "action": "Disable 64-bit Sweet32 block ciphers.",
-            },
-        ],
+        "package_ver": PACKAGE_VER,
+        "triggered_count": len(triggered & set(PLAYBOOK)),
+        "remediation_directives": sorted(
+            directives, key=lambda d: (not d["triggered_in_session"], d["rule_id"])
+        ),
     }

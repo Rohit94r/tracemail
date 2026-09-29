@@ -142,6 +142,7 @@ def ingest_sample_capture(sample_name: str = "stripped"):
         "no-tls": "no-tls.pcap",
         "unused": "advertised-unused.pcap",
         "advertised-unused": "advertised-unused.pcap",
+        "multihop": "multihop.pcap",
     }
     target_filename = filename_map.get(sample_name.lower(), "stripped.pcap")
     target_path = CORPUS_DIR / target_filename

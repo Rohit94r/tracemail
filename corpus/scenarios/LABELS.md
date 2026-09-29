@@ -11,6 +11,7 @@ ServerHello / Certificate / ServerKeyExchange are actual wire bytes.
 | `weak-cipher.pcap` | `SMS-CIPH-002` | medium | imap | real TLS1.2, static-RSA suite 0x002f (no forward secrecy) |
 | `weak-key.pcap` | `SMS-KEY-001` | high | pop3 | real TLS1.2, RSA-1024 leaf cert |
 | `no-tls.pcap` | `SMS-ENF-002` | high | pop3 | POP3 in the clear on port 995 |
+| `multihop.pcap` | `SMS-ENF-002` | high | ? |  |
 
 ## Reproducibility
 

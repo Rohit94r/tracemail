@@ -119,8 +119,10 @@ CLIENT_IP, SERVER_IP = "198.51.100.10", "198.51.100.20"
 class Conversation:
     """Replays a scripted client<->server byte dialog into a PcapWriter."""
 
-    def __init__(self, w: PcapWriter, client_port: int, server_port: int):
+    def __init__(self, w: PcapWriter, client_port: int, server_port: int,
+                 client_ip: str = CLIENT_IP, server_ip: str = SERVER_IP):
         self.w, self.cp, self.sp = w, client_port, server_port
+        self.cip, self.sip = client_ip, server_ip
         self.cseq, self.sseq = 1000, 5000
         self.t = _ts()
 
@@ -128,13 +130,13 @@ class Conversation:
         self.t += 0.0004
 
     def c2s(self, data: bytes, flags: int = PSH | ACK):
-        self.w.packet(self.t, MAC_C, MAC_S, CLIENT_IP, SERVER_IP, self.cp, self.sp,
+        self.w.packet(self.t, MAC_C, MAC_S, self.cip, self.sip, self.cp, self.sp,
                       self.cseq, self.sseq, flags, data)
         self.cseq += len(data)
         self._tick()
 
     def s2c(self, data: bytes, flags: int = PSH | ACK):
-        self.w.packet(self.t, MAC_S, MAC_C, SERVER_IP, CLIENT_IP, self.sp, self.cp,
+        self.w.packet(self.t, MAC_S, MAC_C, self.sip, self.cip, self.sp, self.cp,
                       self.sseq, self.cseq, flags, data)
         self.sseq += len(data)
         self._tick()
@@ -472,12 +474,58 @@ def s5_no_tls() -> Path:
     return p
 
 
+def s6_multihop() -> Path:
+    """
+    Three sequential SMTP relays on one capture -> a real D2 delivery chain.
+
+    Each hop uses a distinct server IP so the parser observes three separate
+    flows and the delivery graph is built from observed topology rather than
+    from fixtures.     Hop 0 accepts STARTTLS with 220 and then keeps talking in cleartext
+    (SMS-ENF-002). Hop 1 answers 454 and refuses it outright, then continues
+    in cleartext (SMS-ENF-002) -- the middle relay is the weakest link. Hop 2
+    never issues STARTTLS at all (SMS-ENF-001). So the chain exercises two
+    distinct cleartext causes across a real three-hop delivery path.
+    """
+    p = SCENARIOS / "multihop.pcap"
+    w = PcapWriter(p)
+    hops = [
+        # (server_ip, client_ip, port, behaviour)
+        ("198.51.100.20", "198.51.100.10", 25, "accept"),
+        ("203.0.113.53", "198.51.100.20", 25, "refuse"),
+        ("203.0.113.77", "203.0.113.53", 25, "clear"),
+    ]
+    for i, (sip, cip, port, behaviour) in enumerate(hops):
+        c = Conversation(w, 49152 + i, port, client_ip=cip, server_ip=sip)
+        c.handshake()
+        c.s2c(b"220 relay%d.lab.example ESMTP\r\n" % i)
+        c.c2s(_b("EHLO forensics-client\r\n"))
+        c.s2c(SMTP_EHLO_OK)
+        if behaviour == "accept":
+            c.c2s(_b("STARTTLS\r\n"))
+            c.s2c(_b("220 2.0.0 Ready to start TLS\r\n"))
+            # The relay would negotiate TLS here; the capture keeps the
+            # plaintext dialog so the hop ordering stays readable.
+        elif behaviour == "refuse":
+            c.c2s(_b("STARTTLS\r\n"))
+            c.s2c(SMTP_454)              # <-- the strip, on the middle hop
+        c.c2s(_b("MAIL FROM:<alice@lab.example>\r\n"))
+        c.s2c(_b("250 2.1.0 Ok\r\n"))
+        c.c2s(_b("RCPT TO:<bob@peer.example>\r\n"))
+        c.s2c(_b("250 2.1.5 Ok\r\n"))
+        c.c2s(_b("QUIT\r\n"))
+        c.s2c(_b("221 2.0.0 Bye\r\n"))
+        c.teardown()
+    w.close()
+    return p
+
+
 SCENARIOS_BUILD = [
     ("stripped.pcap", s1_stripped, "SMS-ENF-002", "high"),
     ("advertised-unused.pcap", s2_advertised_unused, "SMS-ENF-001", "medium"),
     ("weak-cipher.pcap", s3_weak_cipher, "SMS-CIPH-002", "medium"),
     ("weak-key.pcap", s4_weak_key, "SMS-KEY-001", "high"),
     ("no-tls.pcap", s5_no_tls, "SMS-ENF-002", "high"),
+    ("multihop.pcap", s6_multihop, "SMS-ENF-002", "high"),
 ]
 
 
@@ -546,7 +594,7 @@ def main() -> None:
         lines.append(f"{digest}  scenarios/{path.name}")
     (HERE / "expected" / "corpus.sha256").write_text("\n".join(lines) + "\n")
 
-    print(f"\nDone: {len(made)}/5 scenarios -> {SCENARIOS}")
+    print(f"\nDone: {len(made)}/{len(SCENARIOS_BUILD)} scenarios -> {SCENARIOS}")
     print(f"Pinned SHA-256 -> {HERE / 'expected' / 'corpus.sha256'}")
     print("Note: TLS captures embed fresh handshake randomness -- these files are now frozen fixtures.")
     print("Next: `make verify` re-runs the pipeline against them (never the generator).")
