@@ -11,31 +11,66 @@ import {
 } from "lucide-react";
 import { useDashboard } from "@/components/dashboard/DashboardContext";
 
+interface Citation {
+  span_id: string;
+  source: string;
+  data_source: "observed" | "derived" | "demo_fixture";
+  rule_id: string | null;
+  packet_no: number | null;
+}
+
 interface ChatMessage {
   sender: "user" | "raven";
   text: string;
-  citations?: Array<{ id: string; ruleId: string; title: string }>;
+  citations?: Citation[];
   isRefusal?: boolean;
 }
 
+import { EmptyState } from "@/components/ui/EmptyState";
+
+/**
+ * Suggestions must be answerable from the retrieval corpus: RFC/NIST
+ * requirement text, the scoring rubric, and this capture's findings. A prompt
+ * outside that set can only be refused, which looks like a broken product.
+ */
+const SAMPLE_PROMPTS = [
+  "What does SMS-ENF-002 mean and what triggers it?",
+  "What is the minimum recommended RSA key size?",
+  "Why is STARTTLS stripping dangerous?",
+  "How is the posture index calculated?",
+  "What certificate problem was found in this capture?",
+  "What does RFC 8461 require for MTA-STS?",
+];
+
 export default function AskPage() {
-  const { activeSession, findings } = useDashboard();
+  const { activeSession, loadSampleCapture } = useDashboard();
   const [input, setInput] = useState("");
+  const [isAsking, setIsAsking] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       sender: "raven",
-      text: `Hello, I am the Raven Air-Gapped Forensic Assistant. I have indexed ${activeSession.flows.toLocaleString()} flows and ${findings.length} findings from capture '${activeSession.filename}'. Ask me anything about the cryptographic posture or transit violations. Every answer is strictly grounded with cited evidence.`,
+      text: "I am the SecureMailScope forensic assistant. I answer strictly from this capture\u2019s findings, published RFC/NIST criteria, and the scoring rubric. Every sentence I write is checked against the evidence it cites \u2014 if I cannot ground a claim, I refuse instead of guessing. Ingest a capture to begin.",
     },
   ]);
 
-  const samplePrompts = [
-    "Why is relay-gw.partner.net assigned Grade E?",
-    "Which flows experienced active STARTTLS stripping?",
-    "Are there any Sweet32 3DES cipher suites negotiated?",
-    "Tell me the weather in New Delhi today (Test Refusal Guardrail)",
-  ];
-
-  const [isAsking, setIsAsking] = useState(false);
+  if (!activeSession) {
+    return (
+      <EmptyState
+        icon={<Sparkles className="h-6 w-6 text-blue-600" />}
+        title="No Capture Loaded for Forensic Assistant"
+        description="Ingest a packet capture to query the forensic assistant. Every answer is grounded and cited; questions the evidence cannot answer are refused."
+        primaryAction={{
+          label: "Go to Ingestion",
+          href: "/dashboard",
+        }}
+        secondaryAction={{
+          label: "Try Sample Capture (1-Click)",
+          onClick: () => loadSampleCapture("stripped"),
+        }}
+        note="Refuses out-of-scope and ungroundable queries"
+      />
+    );
+  }
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -45,98 +80,52 @@ export default function AskPage() {
     setInput("");
     setIsAsking(true);
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+    let data: {
+      answer: string | null;
+      citations?: Citation[];
+      refused: boolean;
+      refusal_reason?: string | null;
+    };
+
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
       const res = await fetch(`${apiUrl}/api/v1/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, session_id: activeSession.id }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: data.answer,
-            citations: data.citations?.map((c: { finding_id: string; rule_id: string; title: string }) => ({
-              id: c.finding_id,
-              ruleId: c.rule_id,
-              title: c.title,
-            })),
-            isRefusal: data.refused,
-          },
-        ]);
-        setIsAsking(false);
-        return;
-      }
-    } catch {
-      // Fallback to local heuristic reasoning if backend disconnected
+      if (!res.ok) throw new Error(`assistant returned ${res.status}`);
+      data = await res.json();
+    } catch (err) {
+      // The backend is the only source of evidence. If it is unreachable we
+      // report that plainly rather than composing an answer locally: a
+      // fabricated packet number or score is worse than no answer, because an
+      // analyst cannot tell it apart from a real one.
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "raven",
+          text: `UNAVAILABLE: the analysis backend could not be reached (${
+            err instanceof Error ? err.message : "network error"
+          }). No answer was generated, because this assistant only reports evidence it can cite. Check that the API is running at ${apiUrl}.`,
+          isRefusal: true,
+        },
+      ]);
+      setIsAsking(false);
+      return;
     }
 
-    // Local heuristic reasoning fallback
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-
-      if (lower.includes("weather") || lower.includes("stock") || lower.includes("unrelated")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: "REFUSAL: Not enough forensic evidence in this capture to answer that. Raven operates 100% air-gapped and refuses to answer questions that cannot be grounded in observed packet captures or RFC email security standards.",
-            isRefusal: true,
-          },
-        ]);
-      } else if (lower.includes("partner.net") || lower.includes("grade e") || lower.includes("relay")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: "relay-gw.partner.net was assigned Grade E (42/100) because Hop 2 exhibited an active STARTTLS stripping downgrade attack. In packet #142 (byte offset 0x00004F2A), the server's 250-STARTTLS advertisement was stripped on wire, forcing subsequent MAIL FROM and RCPT TO transactions into unencrypted cleartext. Furthermore, the domain has no MTA-STS policy deployed.",
-            citations: [
-              { id: "FIND-001", ruleId: "SMS-ENF-002", title: "Active STARTTLS Stripping" },
-              { id: "FIND-007", ruleId: "SMS-ENF-001", title: "MTA-STS Policy Absent" },
-            ],
-          },
-        ]);
-      } else if (lower.includes("stripping") || lower.includes("starttls")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: "Flow 'tcp-flow-198-51-100-14-port-25' exhibited active STARTTLS suppression. An intermediary node removed the '250-STARTTLS' response token, causing sending MTAs to downgrade to plaintext. This constitutes a direct violation of RFC 3207 and RFC 8461.",
-            citations: [
-              { id: "FIND-001", ruleId: "SMS-ENF-002", title: "Active STARTTLS Stripping" },
-            ],
-          },
-        ]);
-      } else if (lower.includes("sweet32") || lower.includes("3des") || lower.includes("cipher")) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: "Yes, legacy-mx.backup.internal negotiated cipher suite TLS_RSA_WITH_3DES_EDE_CBC_SHA (0x000A) during TLS ServerHello. 3DES utilizes 64-bit blocks vulnerable to Sweet32 collision attacks under NIST SP 800-52r2.",
-            citations: [
-              { id: "FIND-003", ruleId: "SMS-CIPH-001", title: "Deprecated Cipher Suite: 3DES" },
-            ],
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "raven",
-            text: `Based on capture '${activeSession.filename}', Raven identified ${findings.length} findings affecting ${activeSession.flows.toLocaleString()} flows. The overall posture index is ${activeSession.score}/100 [CI: ${activeSession.ciLow}–${activeSession.ciHigh}], primarily degraded by opportunistic cleartext fallback on external partner relays.`,
-            citations: [
-              { id: "FIND-001", ruleId: "SMS-ENF-002", title: "Active STARTTLS Stripping" },
-              { id: "FIND-004", ruleId: "SMS-X509-002", title: "SAN Hostname Mismatch" },
-            ],
-          },
-        ]);
-      }
-      setIsAsking(false);
-    }, 400);
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: "raven",
+        // A refusal has answer=null; the reason is the useful part.
+        text: data.answer ?? data.refusal_reason ?? "No answer produced.",
+        citations: data.citations ?? [],
+        isRefusal: data.refused,
+      },
+    ]);
+    setIsAsking(false);
   };
 
   return (
@@ -194,16 +183,36 @@ export default function AskPage() {
                       Grounded Forensic Citations:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {msg.citations.map((cite) => (
-                        <Link
-                          key={cite.id}
-                          href={`/dashboard/findings?id=${cite.ruleId}`}
-                          className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-1 font-mono text-[10px] font-bold text-primary hover:bg-primary hover:text-white transition-colors"
-                        >
-                          <span>[{cite.id}] {cite.ruleId}</span>
-                          <ExternalLink className="h-2.5 w-2.5" />
-                        </Link>
-                      ))}
+                      {msg.citations.map((cite) =>
+                        cite.rule_id ? (
+                          <Link
+                            key={cite.span_id}
+                            href={`/dashboard/findings?id=${cite.rule_id}`}
+                            className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-1 font-mono text-[10px] font-bold text-primary hover:bg-primary hover:text-white transition-colors"
+                          >
+                            <span>{cite.rule_id}</span>
+                            {cite.packet_no != null && (
+                              <span className="font-sans font-normal opacity-70">
+                                pkt {cite.packet_no}
+                              </span>
+                            )}
+                            <ExternalLink className="h-2.5 w-2.5" />
+                          </Link>
+                        ) : (
+                          // Reference spans (RFC, rubric) have no finding to
+                          // deep-link to, so they render as plain provenance.
+                          <span
+                            key={cite.span_id}
+                            title={cite.source}
+                            className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] font-bold text-slate-600"
+                          >
+                            <span>{cite.span_id}</span>
+                            <span className="font-sans font-normal opacity-60">
+                              {cite.data_source}
+                            </span>
+                          </span>
+                        )
+                      )}
                     </div>
                   </div>
                 )}
@@ -215,9 +224,9 @@ export default function AskPage() {
         {/* Suggested Prompt Chips */}
         <div className="border-t border-border bg-white px-6 py-2.5 flex flex-wrap items-center gap-2 text-xs">
           <span className="text-slate-400 font-semibold text-[11px]">Suggestions:</span>
-          {samplePrompts.map((p, i) => (
+          {SAMPLE_PROMPTS.map((p) => (
             <button
-              key={i}
+              key={p}
               onClick={() => handleSend(p)}
               className="rounded-lg border border-border bg-surface-soft px-2.5 py-1 text-[11px] text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition-colors"
             >

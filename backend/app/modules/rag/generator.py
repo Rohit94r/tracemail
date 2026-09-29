@@ -70,8 +70,10 @@ def _clean(text: str) -> str:
     text = text.replace("\u3010", "[").replace("\u3011", "]")
     text = re.sub(r"\]\s*\]", "]", text)
     # Models pad citations with spaces ("[ id ]"); citations must be machine
-    # resolvable, so tighten them to a canonical "[id]" form.
-    text = re.sub(r"\[\s*`?\s*([A-Za-z0-9_.\-]+?)\s*`?\s*\]", r"[\1]", text)
+    # resolvable, so tighten them to a canonical "[id]" form. A closing bracket
+    # directly after a word still needs a separating space, so add one back.
+    text = re.sub(r"\[\s*`?\s*([A-Za-z0-9_.\-]+?)\s*`?\s*\]", r" [\1] ", text)
+    text = re.sub(r"\s+([.,;:!?])", r"\1", text)
     # Collapse the hard line breaks models use for list layout.
     text = re.sub(r"\s*\n\s*", " ", text)
     return re.sub(r"[ \t]{2,}", " ", text).strip()

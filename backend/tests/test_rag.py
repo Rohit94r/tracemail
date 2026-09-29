@@ -79,6 +79,56 @@ def test_retrieval_returns_nothing_for_unrelated_query():
     assert retriever.retrieve("zzzqqq nonexistent gibberish token", k=3) == []
 
 
+# Questions a user would plausibly type, paired with the behaviour we need.
+# Regressions here mean the assistant silently refuses a fair question, or
+# worse, ranks noise for one it cannot answer.
+ANSWERABLE = [
+    "What is the minimum recommended RSA key size?",
+    "How is the posture index calculated?",
+    "What does SMS-ENF-002 mean and what triggers it?",
+    "Why is STARTTLS stripping dangerous?",
+    "What does RFC 8461 require for MTA-STS?",
+    "Is DANE useful for SMTP?",
+    "What happens to forward secrecy?",
+    "How do I fix a weak key?",
+    "Is my posture score trustworthy?",
+    "What certificate problem was found in this capture?",
+]
+
+UNANSWERABLE = [
+    "zzzqqq gibberish question with no corpus match",
+    "Who won the football world cup in 1998?",
+    "What is the capital city of Peru?",
+    "What is the weather in Tokyo?",
+    "tell me a joke about cats",
+]
+
+
+@pytest.mark.parametrize("question", ANSWERABLE)
+def test_plausible_question_retrieves_evidence(question):
+    """Ordinary English scaffolding must not defeat the OOV guardrail."""
+    assert retriever.retrieve(question, k=3), f"no evidence retrieved for: {question}"
+
+
+@pytest.mark.parametrize("question", UNANSWERABLE)
+def test_unanswerable_question_retrieves_nothing(question):
+    """BM25 must not rank noise for a question the corpus cannot answer."""
+    assert retriever.retrieve(question, k=3) == [], f"retrieved noise for: {question}"
+
+
+def test_question_scaffolding_words_are_discounted():
+    """
+    "what/minimum/recommended" are ordinary English and never appear in a
+    standards corpus, so they must not be counted as out-of-vocabulary.
+    """
+    r = retriever.Retriever(retriever.build_corpus())
+    # With the scaffolding words present, only the topic words are judged, and
+    # they are all in-vocabulary -- so this must not read as unanswerable.
+    assert r.oov_ratio("What is the minimum recommended RSA key size?") <= 1 / 3
+    # A bare topic phrase with every word in the corpus is fully in-vocabulary.
+    assert r.oov_ratio("RSA certificate") == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Cite-or-refuse verifier (the security control)
 # ---------------------------------------------------------------------------

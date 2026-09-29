@@ -178,6 +178,29 @@ _STOP = {
     "not", "must", "may", "s", "t", "if",
 }
 
+# Ordinary English question scaffolding. These words carry no topic signal and
+# will never appear in a standards corpus, so they are excluded before the
+# out-of-vocabulary check rather than being counted against it.
+_QUESTION_WORDS = {
+    "what", "which", "why", "how", "when", "where", "who", "whom", "whose",
+    "does", "did", "do", "is", "are", "was", "were", "can", "could", "should",
+    "would", "will", "shall", "may", "tell", "explain", "describe", "mean",
+    "means", "mean", "used", "using", "use", "does", "mean", "according",
+    "required", "require", "requires", "recommend", "recommends",
+    "recommended", "minimum", "max", "maximum", "best", "good", "know",
+    "want", "need", "please", "give", "show", "find", "about", "any", "all",
+    "here", "there", "now", "get", "got", "make", "made", "also", "more",
+    "most", "much", "many", "some", "only", "just", "very", "into", "out",
+    "than", "then", "them", "they", "their", "have", "has", "had", "been",
+    # Adjectives and verdicts: a question about whether something is
+    # "dangerous" or "weak" is really a question about the thing itself.
+    "dangerous", "safe", "unsafe", "weak", "strong", "secure", "insecure",
+    "bad", "good", "ok", "okay", "fine", "wrong", "right", "true", "false",
+    "happen", "happens", "occur", "occurs", "mean", "matters", "important",
+    "problem", "problems", "issue", "issues", "risk", "risky", "vulnerable",
+    "attack", "attacks", "exploit", "threat", "dangerous", "correct",
+}
+
 
 def _tokenize(text: str) -> List[str]:
     return [t for t in _TOKEN.findall(text.lower()) if t not in _STOP and len(t) > 1]
@@ -376,18 +399,28 @@ class Retriever:
 
     def oov_ratio(self, query: str) -> float:
         """
-        Fraction of query content words absent from the whole corpus.
+        Fraction of *discriminative* query words absent from the corpus.
 
-        BM25 will happily score a nonsense query highly as long as it shares a
-        common word with the corpus ("match", "no"), which would let an
-        unanswerable question through the evidence guardrail. Requiring most
-        query words to be in-vocabulary rejects that case before ranking.
+        A question is padded with ordinary English that will never appear in a
+        standards corpus ("what", "minimum", "recommended"), so those words
+        must be discounted rather than counted as evidence of a bad query. What
+        matters is whether the topic words are in-vocabulary: "RSA key size"
+        is, "zzzqqq wwww" is not.
+
+        Words are discounted when they are common English, when they are part of
+        the question scaffolding, or when they are short and therefore likely
+        function words. A query whose remaining topic words are unknown is
+        treated as unanswerable, which stops BM25 from ranking noise for it.
         """
         terms = [t for t in _tokenize(query) if len(t) > 2]
         if not terms:
             return 1.0
-        missing = sum(1 for t in terms if self._df.get(t, 0) == 0)
-        return missing / len(terms)
+        # Keep only words that plausibly denote a topic.
+        topic = [t for t in terms if t not in _QUESTION_WORDS]
+        if not topic:
+            return 1.0
+        missing = sum(1 for t in topic if self._df.get(t, 0) == 0)
+        return missing / len(topic)
 
     def search(self, query: str, k: int = 6) -> List[Tuple[Span, float]]:
         if not self.spans:
