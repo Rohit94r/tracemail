@@ -1,14 +1,23 @@
 {
-  "name": "platform",
+  "name": "@raven/platform",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:frontend": "next dev",
+    "dev:backend": "python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 --reload",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "python3 -m pytest backend/tests",
+    "verify": "python3 -m backend.app.cli verify",
+    "score": "python3 -m backend.app.cli score",
+    "setup": "node scripts/setup.mjs"
   },
   "dependencies": {
+    "framer-motion": "^13.4.5",
+    "lottie-react": "^3.1.2",
+    "lucide-react": "^1.48.0",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"

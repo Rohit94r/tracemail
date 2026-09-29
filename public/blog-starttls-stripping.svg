@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d"/>
+      <stop offset="100%" stop-color="#12182b"/>
+    </linearGradient>
+    <linearGradient id="accent-cyan-1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#44d5cc"/>
+      <stop offset="100%" stop-color="#22b8cf"/>
+    </linearGradient>
+    <linearGradient id="accent-orange-1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6500"/>
+      <stop offset="100%" stop-color="#ff8533"/>
+    </linearGradient>
+    <pattern id="grid-pattern-1" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" stroke-width="0.75" stroke-opacity="0.4"/>
+    </pattern>
+    <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#bg-grad-1)"/>
+  <rect width="800" height="500" fill="url(#grid-pattern-1)"/>
+
+  <!-- Radial Glow Behind Card -->
+  <circle cx="400" cy="250" r="220" fill="#ff6500" opacity="0.08" filter="blur(40px)"/>
+  <circle cx="200" cy="180" r="160" fill="#44d5cc" opacity="0.06" filter="blur(50px)"/>
+
+  <!-- Card Frame -->
+  <g transform="translate(60, 45)">
+    <!-- Header Terminal Bar -->
+    <rect width="680" height="410" rx="16" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+    <rect width="680" height="42" rx="16" fill="#1e293b"/>
+    <rect y="26" width="680" height="16" fill="#1e293b"/>
+    
+    <!-- Window controls -->
+    <circle cx="24" cy="21" r="5" fill="#ef4444"/>
+    <circle cx="42" cy="21" r="5" fill="#f59e0b"/>
+    <circle cx="60" cy="21" r="5" fill="#10b981"/>
+    
+    <text x="340" y="26" fill="#94a3b8" font-family="monospace" font-size="12" text-anchor="middle" font-weight="600">RAVEN_INSPECTOR // STARTTLS_SESSION_FLOW.PCAP</text>
+    <rect x="580" y="12" width="80" height="18" rx="9" fill="#ff6500" fill-opacity="0.2"/>
+    <text x="620" y="25" fill="#ff8533" font-family="sans-serif" font-size="10" font-weight="700" text-anchor="middle">LIVE MITM</text>
+
+    <!-- MTA Architecture Flow Diagram -->
+    <g transform="translate(30, 65)">
+      <!-- Client Node -->
+      <rect x="0" y="0" width="160" height="70" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="16" y="25" fill="#94a3b8" font-family="sans-serif" font-size="10" font-weight="600">ORIGIN MTA</text>
+      <text x="16" y="45" fill="#f8fafc" font-family="monospace" font-size="13" font-weight="700">mail.corp.net</text>
+      <text x="16" y="60" fill="#44d5cc" font-family="monospace" font-size="10">IP: 198.51.100.14</text>
+
+      <!-- Arrow 1 -->
+      <path d="M 165 35 L 245 35" stroke="#44d5cc" stroke-width="2" stroke-dasharray="4,4"/>
+      <polygon points="245,31 253,35 245,39" fill="#44d5cc"/>
+
+      <!-- Adversary / Interceptor Node -->
+      <g transform="translate(255, -8)">
+        <rect x="0" y="0" width="170" height="86" rx="10" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+        <rect x="10" y="10" width="150" height="20" rx="4" fill="#ef4444" fill-opacity="0.2"/>
+        <text x="85" y="24" fill="#f87171" font-family="sans-serif" font-size="10" font-weight="800" text-anchor="middle">STRIPPING INTRUSION</text>
+        <text x="85" y="48" fill="#fecaca" font-family="monospace" font-size="11" text-anchor="middle">250-STARTTLS</text>
+        <text x="85" y="65" fill="#ef4444" font-family="sans-serif" font-size="11" font-weight="700" text-anchor="middle">REMOVED / STRIPPED</text>
+      </g>
+
+      <!-- Arrow 2 -->
+      <path d="M 430 35 L 495 35" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,4"/>
+      <polygon points="495,31 503,35 495,39" fill="#ef4444"/>
+
+      <!-- Destination Node -->
+      <g transform="translate(505, 0)">
+        <rect x="0" y="0" width="145" height="70" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+        <text x="14" y="25" fill="#94a3b8" font-family="sans-serif" font-size="10" font-weight="600">INGRESS GATEWAY</text>
+        <text x="14" y="45" fill="#f8fafc" font-family="monospace" font-size="13" font-weight="700">mx1.target.org</text>
+        <text x="14" y="60" fill="#94a3b8" font-family="monospace" font-size="10">Port 25 / Cleartext</text>
+      </g>
+    </g>
+
+    <!-- Forensic Packet Hex Stream / Protocol Exchange -->
+    <g transform="translate(30, 175)">
+      <rect width="620" height="155" rx="8" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+      
+      <!-- Exchange Lines -->
+      <text x="20" y="30" fill="#64748b" font-family="monospace" font-size="11">00:00:01.104</text>
+      <text x="120" y="30" fill="#44d5cc" font-family="monospace" font-size="11">&gt;&gt; EHLO mail.corp.net</text>
+      <text x="440" y="30" fill="#10b981" font-family="monospace" font-size="11">[SYN-ACK VERIFIED]</text>
+
+      <text x="20" y="58" fill="#64748b" font-family="monospace" font-size="11">00:00:01.128</text>
+      <text x="120" y="58" fill="#94a3b8" font-family="monospace" font-size="11">&lt;&lt; 250-mx1.target.org offers [PIPELINING, 8BITMIME, SIZE]</text>
+      
+      <text x="20" y="86" fill="#ef4444" font-family="monospace" font-size="11">00:00:01.135</text>
+      <text x="120" y="86" fill="#f87171" font-family="monospace" font-size="11" font-weight="700">&lt;&lt; [ALERT] STARTTLS CAPABILITY SUPPRESSED BY HOP 2</text>
+      <rect x="520" y="73" width="85" height="18" rx="4" fill="#ef4444"/>
+      <text x="562" y="86" fill="#ffffff" font-family="sans-serif" font-size="9" font-weight="800" text-anchor="middle">CLEARTEXT</text>
+
+      <text x="20" y="114" fill="#64748b" font-family="monospace" font-size="11">00:00:01.189</text>
+      <text x="120" y="114" fill="#e2e8f0" font-family="monospace" font-size="11">&gt;&gt; MAIL FROM:&lt;cfo@corp.net&gt; [TRANSMITTING IN UNENCRYPTED PLAINTEXT]</text>
+
+      <text x="20" y="142" fill="#64748b" font-family="monospace" font-size="11">00:00:01.210</text>
+      <text x="120" y="142" fill="#ff8533" font-family="monospace" font-size="11">&gt;&gt; EVIDENCE HASH: sha256:d8b74c81...9e01 (Offset: 0x00004f2a)</text>
+    </g>
+
+    <!-- Bottom Metric Banner -->
+    <g transform="translate(30, 345)">
+      <rect width="620" height="45" rx="8" fill="#1e293b" fill-opacity="0.6" stroke="#334155" stroke-width="1"/>
+      <circle cx="25" cy="22" r="7" fill="#ef4444"/>
+      <text x="42" y="27" fill="#f8fafc" font-family="sans-serif" font-size="12" font-weight="700">DOWNGRADE RADAR: STRIP-ACTIVE DETECTED</text>
+      <text x="590" y="27" fill="#94a3b8" font-family="monospace" font-size="11" text-anchor="end">RFC 3207 VIOLATION // ZERO-TOUCH AIR-GAPPED</text>
+    </g>
+  </g>
+</svg>

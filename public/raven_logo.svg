@@ -1,0 +1,23 @@
+<svg width="400" height="100" viewBox="0 0 400 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Raven Geometric Cyber Bird Mark -->
+  <g transform="translate(10, 14)">
+    <!-- Outer Shield / Wing -->
+    <path d="M36 2L4 20V52C4 68 18 82 36 86C54 82 68 68 68 52V20L36 2Z" stroke="#FF6500" stroke-width="4" stroke-linejoin="round" fill="none" opacity="0.25"/>
+    <!-- Raven Stylized Geometric Head & Beak -->
+    <path d="M36 10L62 36H42L52 56L36 44L20 56L30 36H10L36 10Z" fill="#FF6500"/>
+    <!-- Central Eye / Core -->
+    <circle cx="36" cy="30" r="3.5" fill="#FFFFFF"/>
+    <!-- Cyber Accent Nodes -->
+    <circle cx="4" cy="20" r="3" fill="#44D5CC"/>
+    <circle cx="68" cy="20" r="3" fill="#44D5CC"/>
+    <circle cx="36" cy="86" r="3.5" fill="#FF6500"/>
+  </g>
+  <!-- Wordmark "RAVEN" -->
+  <text x="96" y="58" font-family="'Inter Tight', system-ui, -apple-system, sans-serif" font-size="40" font-weight="800" letter-spacing="-0.03em" fill="#0C0C0C">
+    RAVEN
+  </text>
+  <!-- Sub-label -->
+  <text x="98" y="76" font-family="'Inter Tight', system-ui, -apple-system, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.18em" fill="#FF6500">
+    SECUREMAILSCOPE
+  </text>
+</svg>

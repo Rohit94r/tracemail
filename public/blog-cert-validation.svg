@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d"/>
+      <stop offset="100%" stop-color="#141c30"/>
+    </linearGradient>
+    <pattern id="grid-pattern-2" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" stroke-width="0.75" stroke-opacity="0.4"/>
+    </pattern>
+    <linearGradient id="cert-warn" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#bg-grad-2)"/>
+  <rect width="800" height="500" fill="url(#grid-pattern-2)"/>
+
+  <!-- Radial Glow Behind Card -->
+  <circle cx="250" cy="200" r="180" fill="#f59e0b" opacity="0.08" filter="blur(50px)"/>
+  <circle cx="550" cy="280" r="180" fill="#44d5cc" opacity="0.06" filter="blur(50px)"/>
+
+  <!-- Card Frame -->
+  <g transform="translate(60, 45)">
+    <!-- Header Terminal Bar -->
+    <rect width="680" height="410" rx="16" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+    <rect width="680" height="42" rx="16" fill="#1e293b"/>
+    <rect y="26" width="680" height="16" fill="#1e293b"/>
+    
+    <!-- Window controls -->
+    <circle cx="24" cy="21" r="5" fill="#ef4444"/>
+    <circle cx="42" cy="21" r="5" fill="#f59e0b"/>
+    <circle cx="60" cy="21" r="5" fill="#10b981"/>
+    
+    <text x="340" y="26" fill="#94a3b8" font-family="monospace" font-size="12" text-anchor="middle" font-weight="600">X509_CERT_CHAIN_VALIDATOR // PASSIVE_AUDIT</text>
+    <rect x="545" y="12" width="115" height="18" rx="9" fill="#f59e0b" fill-opacity="0.2"/>
+    <text x="602" y="25" fill="#fbbf24" font-family="sans-serif" font-size="10" font-weight="700" text-anchor="middle">30.4% UNVERIFIED</text>
+
+    <!-- Certificate Chain Inspector Split -->
+    <g transform="translate(25, 60)">
+      <!-- Left Column: Trust Chain Visual -->
+      <g transform="translate(0, 0)">
+        <rect width="270" height="325" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+        <text x="20" y="28" fill="#94a3b8" font-family="sans-serif" font-size="11" font-weight="700">CERTIFICATE CHAIN HIERARCHY</text>
+
+        <!-- Root CA -->
+        <g transform="translate(15, 45)">
+          <rect width="240" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+          <circle cx="20" cy="28" r="6" fill="#10b981"/>
+          <text x="35" y="24" fill="#f8fafc" font-family="monospace" font-size="11" font-weight="700">ISRG Root X1</text>
+          <text x="35" y="42" fill="#10b981" font-family="sans-serif" font-size="9" font-weight="600">TRUST ANCHOR VERIFIED</text>
+        </g>
+
+        <!-- Chain Link 1 -->
+        <path d="M 135 100 L 135 125" stroke="#10b981" stroke-width="2" stroke-dasharray="3,3"/>
+
+        <!-- Intermediate CA -->
+        <g transform="translate(15, 125)">
+          <rect width="240" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+          <circle cx="20" cy="28" r="6" fill="#10b981"/>
+          <text x="35" y="24" fill="#f8fafc" font-family="monospace" font-size="11" font-weight="700">R3 Intermediate CA</text>
+          <text x="35" y="42" fill="#10b981" font-family="sans-serif" font-size="9" font-weight="600">VALID SIGNATURE</text>
+        </g>
+
+        <!-- Chain Link 2 (Broken) -->
+        <path d="M 135 180 L 135 205" stroke="#ef4444" stroke-width="2"/>
+        <text x="145" y="196" fill="#ef4444" font-family="sans-serif" font-size="9" font-weight="800">CHAIN BROKEN</text>
+
+        <!-- Leaf Cert (Failed) -->
+        <g transform="translate(15, 205)">
+          <rect width="240" height="95" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+          <circle cx="20" cy="25" r="6" fill="#ef4444"/>
+          <text x="35" y="22" fill="#fecaca" font-family="monospace" font-size="11" font-weight="700">CN: legacy-mx.corp.local</text>
+          <text x="35" y="40" fill="#f87171" font-family="sans-serif" font-size="9" font-weight="700">HOSTNAME MISMATCH</text>
+          <text x="35" y="58" fill="#94a3b8" font-family="monospace" font-size="9">Expected: mx1.corp.com</text>
+          <text x="35" y="75" fill="#f59e0b" font-family="monospace" font-size="9">SAN Missing DNS entry</text>
+        </g>
+      </g>
+
+      <!-- Right Column: Cryptographic Breakdown -->
+      <g transform="translate(290, 0)">
+        <rect width="340" height="325" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+        
+        <text x="20" y="28" fill="#94a3b8" font-family="sans-serif" font-size="11" font-weight="700">CRYPTO PARAMETER VERIFICATION</text>
+
+        <!-- Row 1: Cipher Suite -->
+        <g transform="translate(20, 48)">
+          <rect width="300" height="48" rx="6" fill="#1e293b" fill-opacity="0.7"/>
+          <text x="14" y="20" fill="#64748b" font-family="sans-serif" font-size="9">NEGOTIATED CIPHER SUITE</text>
+          <text x="14" y="37" fill="#44d5cc" font-family="monospace" font-size="11" font-weight="700">TLS_AES_256_GCM_SHA384</text>
+          <rect x="235" y="14" width="52" height="20" rx="4" fill="#10b981" fill-opacity="0.2"/>
+          <text x="261" y="28" fill="#34d399" font-family="sans-serif" font-size="9" font-weight="700" text-anchor="middle">STRONG</text>
+        </g>
+
+        <!-- Row 2: Peer Validation Mode -->
+        <g transform="translate(20, 106)">
+          <rect width="300" height="48" rx="6" fill="#1e293b" fill-opacity="0.7"/>
+          <text x="14" y="20" fill="#64748b" font-family="sans-serif" font-size="9">MTA IDENTITY VERIFICATION</text>
+          <text x="14" y="37" fill="#ef4444" font-family="monospace" font-size="11" font-weight="700">SSL_VERIFY_NONE (Opportunistic)</text>
+          <rect x="235" y="14" width="52" height="20" rx="4" fill="#ef4444" fill-opacity="0.2"/>
+          <text x="261" y="28" fill="#f87171" font-family="sans-serif" font-size="9" font-weight="700" text-anchor="middle">BLIND</text>
+        </g>
+
+        <!-- Row 3: X.509 Expiry Audit -->
+        <g transform="translate(20, 164)">
+          <rect width="300" height="48" rx="6" fill="#1e293b" fill-opacity="0.7"/>
+          <text x="14" y="20" fill="#64748b" font-family="sans-serif" font-size="9">CERTIFICATE LIFESPAN</text>
+          <text x="14" y="37" fill="#f59e0b" font-family="monospace" font-size="11" font-weight="700">Expired 14 Days Ago (Oct 12)</text>
+          <rect x="235" y="14" width="52" height="20" rx="4" fill="#f59e0b" fill-opacity="0.2"/>
+          <text x="261" y="28" fill="#fbbf24" font-family="sans-serif" font-size="9" font-weight="700" text-anchor="middle">STALE</text>
+        </g>
+
+        <!-- Diagnostic Summary -->
+        <g transform="translate(20, 226)">
+          <rect width="300" height="80" rx="6" fill="#182234" stroke="#2563eb" stroke-opacity="0.3" stroke-width="1"/>
+          <text x="14" y="22" fill="#38bdf8" font-family="sans-serif" font-size="10" font-weight="700">RAVEN POSTURE IMPACT</text>
+          <text x="14" y="42" fill="#cbd5e1" font-family="monospace" font-size="10">Finding: UNVERIFIED_PEER_CERTIFICATE</text>
+          <text x="14" y="60" fill="#94a3b8" font-family="sans-serif" font-size="10">Posture Penalty: -18 pts | Grade: B → C+</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
