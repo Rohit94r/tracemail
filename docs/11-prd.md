@@ -42,7 +42,7 @@
 
 ## 3. Scope — the 9 screens
 
-The UI is a **local web dashboard: one sidebar, 9 tabs**. 5 are core (MVP), 4 are stretch (only after core is green). Full component/API detail: `12-ui-spec.md`.
+The UI is a **local web dashboard: one sidebar, 9 tabs**. Per `docs/14` (competitor review), the split is by **build cost, not importance** — 7 screens are core MVP, 2 need an LLM and stay stretch. Full component/API detail: `12-ui-spec.md`.
 
 | # | Tab / route | Purpose | Core? |
 |---|---|---|---|
@@ -51,10 +51,12 @@ The UI is a **local web dashboard: one sidebar, 9 tabs**. 5 are core (MVP), 4 ar
 | 3 | **Delivery Graph** `/graph` | Your MX → peers, weakest-hop flags, traffic-weighted exposure | **M** |
 | 4 | **Findings Explorer** `/findings` | Risk-ranked findings, filters, evidence-chain drawer, Replay trigger | **M** |
 | 5 | **Reports** `/reports` | JSON / PDF / HTML export, report seal, remediation playbook, hardening section | **M** |
-| 6 | **Incident Replay** `/replay` | Animated forensic timeline of a flow; flagged moments; WebM export | S |
-| 7 | **Ask (RAG chat)** `/ask` | Grounded Q&A over findings, every answer cites finding IDs | S |
-| 8 | **Attack Lens** `/lens` | Evidence-forward "likely next attack" forecast with drivers | S |
-| 9 | **Integrity** `/integrity` | `MANIFEST.sha256` tree, chain verification, tamper-flag branch | S |
+| 6 | **Incident Replay** `/replay` | Animated forensic timeline of a flow; flagged moments; WebM export | **M** (promoted — D6) |
+| 7 | **Ask (RAG chat)** `/ask` | Grounded Q&A over findings, every answer cites finding IDs | S — *needs local LLM* |
+| 8 | **Attack Lens** `/lens` | Evidence-forward "likely next attack" forecast with drivers | **M** (promoted — D6) |
+| 9 | **Integrity** `/integrity` | `MANIFEST.sha256` tree, chain verification, tamper-flag branch | S — *UI; `make verify` is core* |
+
+> **Promotion note (29 Sep):** screens 6 and 8 moved from stretch → **core**, because the beyond-PS layer (D6) is a primary differentiator and both need only the evidence store + rule engine (no LLM). Screen 7 stays stretch — it needs Ollama. See `14-competitive-positioning.md` §3.2 and `15-landscape-vs-scope.md`.
 
 **Non-negotiable UX rules**
 - **Screen 1 (Ingest) → Screen 4 (Findings) in ≤3 clicks** after a capture finishes. That path is the demo.
@@ -130,13 +132,13 @@ Priority: **M** = must for MVP · **S** = should/stretch. Grouped by area.
 | FR-36 | Hardening / "stay ahead" report section: policy rollout, key rotation, CT/OCSP, PQC readiness, monitoring thresholds | M |
 | FR-37 | Playbook + hardening render fine with the LLM disabled (deterministic template fallback) | M |
 
-### G. Stretch screens
+### G. Beyond-PS screens (D6 — the primary differentiator)
 | ID | Req | P |
 |---|---|---|
-| FR-38 | Incident Replay: animated timeline of a flow's protocol dialog + TLS handshake, critical moments flagged, scrubber, WebM export | S |
-| FR-39 | Ask (RAG): grounded chat over findings; **must refuse** when retrieval score < threshold; every claim cites finding IDs; links back to evidence | S |
-| FR-40 | Attack Lens: rank likely-next attacks from observed evidence per the `10` §4 mapping; each with likelihood + driving findings + "forecast not fact" label | S |
-| FR-41 | Integrity: MANIFEST tree, per-file SHA-256, chain re-verification, tamper-flag branch | S |
+| FR-38 | Incident Replay: animated timeline of a flow's protocol dialog + TLS handshake, critical moments flagged, scrubber, WebM export | **M** (promoted) |
+| FR-39 | Ask (RAG): grounded chat over findings; **must refuse** when retrieval score < threshold; every claim cites finding IDs; links back to evidence | S (needs LLM) |
+| FR-40 | Attack Lens: rank likely-next attacks from observed evidence per the `10` §4 mapping; each with likelihood + driving findings + "forecast not fact" label | **M** (promoted) |
+| FR-41 | Integrity: MANIFEST tree, per-file SHA-256, chain re-verification, tamper-flag branch. (`make verify` CLI is core via FR-19; this is the UI.) | S |
 
 ### H. Cross-cutting
 | ID | Req | P |
@@ -186,9 +188,9 @@ Stretch screens (6–9) are bonus; they must never block criteria 1–7.
 | **P0 Scaffold** | repo, pyproject, docker-compose, Makefile, CI, `.gitignore` | `make up` healthy |
 | **P1 Core engine** | ingest→features→rules→score→evidence→reports (no UI polish) | CLI run on 1 scenario pcap prints a score |
 | **P2 MVP UI** | screens 1–5 (Ingest, Posture, Graph, Findings, Reports) + live WS | demo path 3-clicks green |
-| **P3 ML + radar + verify** | ML sweep, Radar, enforcement, decay, `make verify` | §6 criteria 1–5 |
+| **P3 ML + radar + verify** | ML sweep, Radar, enforcement, decay, `make verify`, **+ Replay (P3-7) + Attack Lens (P3-8)** | §6 criteria 1–5; Replay & Lens demoable |
 | **P4 Hardening** | playbooks, hardening section, offline polish, demo assets | §6 criteria 6–7 |
-| **P5 Stretch** | screens 6–9 (Replay, Ask, Lens, Integrity) | optional |
+| **P5 Remaining** | screens 7 (RAG chat) + 9 (Integrity UI) | optional |
 
 ---
 

@@ -177,6 +177,21 @@ Screens per `docs/12-ui-spec.md`. Wire frontend to `/api/v1` (extend the routers
 - **Do:** posture time-series per MX, JA3S baseline, changepoint flag → `decay_series`.
 - **Accept:** two synthetic windows with a score drop produce a changepoint marker.
 
+### Task P3-7 — Incident Replay screen (S6) — **PROMOTED TO MVP** (D6)
+- **Deps:** P1-1, P1-3, P1-5
+- **Do:** animated forensic timeline from the evidence store's ordered events (TCP stream → protocol dialog → STARTTLS negotiation → TLS handshake → cert exchange). Critical moments from findings pulse red with `rule_id` + a "why" chip. Scrubber: play/pause/seek/speed + packet-by-packet. WebM/MP4 export.
+- **Guardrail:** shows **observed packets only**; any `NOT-OBSERVABLE` segment is greyed + labelled, never invented.
+- **Accept:** replaying the `stripped.pcap` `SMS-ENF-002` finding animates the exact STARTTLS→plaintext moment; export produces a playable video file. **No LLM required.**
+- *Rationale:* D6 is a primary differentiator (docs/14) and this needs only the evidence store + rule engine.
+
+### Task P3-8 — Attack Lens (S8) — **PROMOTED TO MVP** (D6)
+- **Deps:** P1-3, P3-2
+- **Do:** `GET /api/v1/lens/{session_id}` implementing the `docs/10` §4 evidence→attack mapping. Each forecast requires ≥1 observed finding; carries likelihood (low/med/high) + confidence label + the driving finding IDs; non-dismissible **"FORECAST, NOT FACT"** banner.
+- **Accept:** a downgrade-heavy capture surfaces the top modeled next-attack with its driving findings clickable to evidence. **No LLM required.**
+- *Rationale:* forecasts from deterministic findings + radar signals; the LLM is optional prose only.
+
+**P3 gate (criteria 5):** `make verify` green; ML proven not to alter scores; Replay + Attack Lens demoable.
+
 ### Task P3-6 — `make verify` harness + corpus
 - **Deps:** P1-6, P3-2
 - **Do:** `corpus/scenarios` = 5 labeled pcaps + testssl.sh oracle output; `corpus/expected` = expected report-hash + posture range per scenario. `make verify` recomputes and **fails on drift**.
@@ -211,28 +226,18 @@ Screens per `docs/12-ui-spec.md`. Wire frontend to `/api/v1` (extend the routers
 
 ---
 
-## 6. Stretch (Phase P5) — screens 6–9
+## 6. Stretch (Phase P5) — remaining screens
 
-**Only start after P4 gate.** Each is self-contained and demoable in ~20 s.
+**Only start after the P4 gate.** RAG chat and the Integrity *UI* live here; Replay (P3-7) and Attack Lens (P3-8) were **promoted into MVP** in P3 because they need no LLM (see `docs/14` / `docs/10`).
 
-### Task P5-1 — Incident Replay (S6)
-- **Deps:** P1-5
-- **Do:** animated timeline from ordered evidence events; flagged moments pulse red with rule_id + "why"; scrubber; WebM export. Observed-only; NOT-OBSERVABLE greyed.
-- **Accept:** replaying the `stripped` finding animates the STARTTLS→plaintext moment; export produces a video file.
-
-### Task P5-2 — Ask / RAG chat (S7)
-- **Deps:** P1-6
+### Task P5-2 — Ask / RAG chat (S7) — *requires local LLM*
+- **Deps:** P1-6, P4-1
 - **Do:** `POST /api/v1/ask`; local embeddings (Ollama) over findings/rule catalog/evidence; **refuse** below retrieval threshold; every claim cites finding IDs; links to evidence drawer.
 - **Accept:** "why is outlook's peer grade low?" returns a cited answer; a nonsense question **refuses**; no egress.
 
-### Task P5-3 — Attack Lens (S8)
-- **Deps:** P1-3, P3-2
-- **Do:** `GET /api/v1/lens/{session_id}` implementing the `docs/10` §4 evidence→attack mapping; each forecast needs ≥1 observed finding; likelihood + confidence; non-dismissible "forecast, not fact" banner.
-- **Accept:** a downgrade-heavy capture surfaces the top modeled next-attack with its driving findings.
-
-### Task P5-4 — Integrity / tamper-proof (S9)
-- **Deps:** P1-5
-- **Do:** MANIFEST.sha256 tree; `POST /integrity/verify` re-walks hashes; tamper-flag branch on mismatch; signed git tag in release.
+### Task P5-4 — Integrity UI / tamper-proof manifest (S9)
+- **Deps:** P1-5, P3-6
+- **Do:** MANIFEST.sha256 tree; `POST /integrity/verify` re-walks hashes; tamper-flag branch on mismatch; signed git tag in release. *(The `make verify` harness itself already ships in P3-6 — this task is the in-app UI.)*
 - **Accept:** tampering with one corpus file makes verify show a red ✗ at that node with an explanation.
 
 ---

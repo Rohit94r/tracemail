@@ -88,13 +88,17 @@
 
 ## Integration & roadmap fit
 
-| Feature | Plugs into | MVP? | Phase |
-|---|---|---|---|
-| ① Incident Replay | Reports/Dashboard (new screen + "Replay" button) | no (stretch) | P4+ |
-| ② RAG Chat | Dashboard chat panel; Reports engine reuse | no | P4+ |
-| ③ SHA-256 tamper-proof | Evidence store + corpus + CI (`make verify`) | yes (base part already) | P1 (store) / P5 (manifest+CI) |
-| ④ Attack Lens | ML layer + rule engine (fast picture) | no (stretch) | P5 stretch |
-| ⑤ Hardening & Precautions | Reports engine (second section) | partial (static playbook) | P4 |
+> **Re-prioritised 29 Sep 2026** after competitor-video review (`docs/14`): this beyond-PS layer (D6) is now a **primary differentiator**, not a bonus. **Replay + Attack Lens are promoted to MVP** (they need only the evidence store + rule engine — no LLM). **RAG chat stays stretch** (requires a local Ollama model). Hardening is **partial in MVP** (static template playbook).
+
+| Feature | Plugs into | MVP? | Phase | Task |
+|---|---|---|---|---|
+| ① Incident Replay | Findings "Replay" button → `/replay` screen | **yes — promoted** | **P2** (button) / **P3** (screen) | P2-5 / **P3-7** |
+| ② RAG Chat | Dashboard chat panel; reports engine reuse | no (needs local LLM) | P5 | P5-2 |
+| ③ SHA-256 tamper-proof | Evidence store + corpus + CI (`make verify`) | **yes** | P1 (store) / P3 (`make verify`) / P5 (manifest UI) | P1-5 / P3-6 / P5-4 |
+| ④ Attack Lens | Rule engine + radar (evidence→attack table) | **yes — promoted** | **P3** | **P3-8** |
+| ⑤ Hardening & Precautions | Reports engine (second section) | partial (static playbook) | P4 | P4-2 |
+
+**Dependency note:** Replay needs the evidence store's ordered events (P1-5) and the STARTTLS state machine (P1-1/P1-3). Attack Lens needs rule findings (P1-3) + radar signals (P3-2). Both are therefore schedulable inside P3 with no new dependencies and no LLM.
 
 **Demo budget (~90s total):** one replay of the stripped session (30s) → chat "why is this MX weak?" (20s) → hash seal on the PDF + `make verify` green (20s) → Attack Lens "most likely next" for the same capture (20s).
 
