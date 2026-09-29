@@ -23,7 +23,7 @@ EXPECTED_RULES = {
     "advertised-unused.pcap": "SMS-ENF-001",
     "weak-cipher.pcap": "SMS-CIPH-002",
     "weak-key.pcap": "SMS-KEY-001",
-    "no-tls.pcap": "SMS-ENF-002",
+    "no-tls.pcap": "SMS-ENF-005",
 }
 
 def cmd_score(pcap_path: str, as_json: bool = False) -> int:

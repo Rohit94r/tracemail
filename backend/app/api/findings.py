@@ -32,25 +32,7 @@ def get_findings(
         all_findings = [Finding(**f) for f in raw_db_findings]
         FINDINGS_CACHE[session_id] = all_findings
     else:
-        # If session maps to a scenario pcap in corpus, run real evaluation
-        target_pcap = CORPUS_DIR / "stripped.pcap"
-        if session_id and "weak-cipher" in session_id:
-            target_pcap = CORPUS_DIR / "weak-cipher.pcap"
-        elif session_id and "weak-key" in session_id:
-            target_pcap = CORPUS_DIR / "weak-key.pcap"
-        elif session_id and "no-tls" in session_id:
-            target_pcap = CORPUS_DIR / "no-tls.pcap"
-        elif session_id and "unused" in session_id:
-            target_pcap = CORPUS_DIR / "advertised-unused.pcap"
-
-        effective_sess = session_id or "scenario-stripped"
-        flows, _ = parse_capture(target_pcap, effective_sess)
-        rule_findings, _ = evaluate_rules(flows, effective_sess)
-        radar_findings, _ = compute_radar(flows, effective_sess)
-        all_findings = rule_findings + radar_findings
-
-        # Persist scenario findings to MongoDB Atlas
-        save_db_findings(effective_sess, all_findings)
+        all_findings = []
 
     if severity:
         all_findings = [f for f in all_findings if f.severity.lower() == severity.lower()]

@@ -14,16 +14,47 @@ from pydantic import BaseModel
 
 from ..models import SessionSummary, PostureScore
 from ..modules.ingest import parse_capture
+from ..modules.pcap_index import capture_digest, first_capture_time
 from ..modules.rules import evaluate_rules
 from ..modules.posture import compute_posture
 from ..modules.radar import compute_radar
 from ..db import save_db_session, get_db_sessions, save_db_findings, save_db_posture
 from ..config import PACKAGE_VER
-from ..state import SESSION_CACHE, FINDINGS_CACHE, MX_CACHE
+from ..state import SESSION_CACHE, FINDINGS_CACHE, MX_CACHE, FLOW_CACHE
 
 router = APIRouter(prefix="/api/v1/captures", tags=["Captures"])
 
 CORPUS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "corpus" / "scenarios"
+
+_digest_cache: dict = {}
+
+
+def _corpus_digest(path: Path) -> str:
+    """SHA-256 of a corpus capture, used as its content address."""
+    key = str(path)
+    if key not in _digest_cache:
+        try:
+            _digest_cache[key] = capture_digest(path)
+        except OSError:
+            _digest_cache[key] = None
+    return _digest_cache[key]
+
+
+def _corpus_started_at(path: Path) -> str | None:
+    """Real first-packet timestamp of a corpus capture (never a hardcoded date)."""
+    try:
+        epoch = first_capture_time(path)
+    except (OSError, ValueError):
+        return None
+    if epoch is None:
+        return None
+    import datetime as _dt
+
+    return (
+        _dt.datetime.fromtimestamp(epoch, _dt.timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 class FolderModeRequest(BaseModel):
     path: str
@@ -48,7 +79,7 @@ def list_sessions():
                 SessionSummary(
                     id=sid,
                     source_file=s.get("source_file") or s.get("filename", "capture.pcap"),
-                    started_at=s.get("started_at", "2026-09-29 12:00:00 UTC"),
+                    started_at=s.get("started_at"),
                     flow_count=s.get("flow_count", 1),
                     package_ver=s.get("package_ver", PACKAGE_VER),
                     report_hash=s.get("report_hash"),
@@ -66,7 +97,7 @@ def list_sessions():
                 SessionSummary(
                     id=sess_id,
                     source_file=s.get("source_file") or s.get("filename", "capture.pcap"),
-                    started_at=s.get("started_at", "2026-09-29 12:00:00 UTC"),
+                    started_at=s.get("started_at"),
                     flow_count=s.get("flow_count", 1),
                     package_ver=PACKAGE_VER,
                     report_hash=s.get("report_hash"),
@@ -76,28 +107,99 @@ def list_sessions():
                 )
             )
 
-    # If corpus directory has scenarios, register them
-    if CORPUS_DIR.exists():
-        for pcap_file in sorted(CORPUS_DIR.glob("*.pcap*")):
-            sess_id = f"scenario-{pcap_file.stem}"
-            if sess_id not in seen_ids:
-                seen_ids.add(sess_id)
-                file_hash = hashlib.sha256(pcap_file.read_bytes()).hexdigest()
-                summaries.append(
-                    SessionSummary(
-                        id=sess_id,
-                        source_file=pcap_file.name,
-                        started_at="2026-09-29 12:00:00 UTC",
-                        flow_count=1,
-                        package_ver=PACKAGE_VER,
-                        report_hash=f"sha256:{file_hash}",
-                        score=58.0 if "stripped" in pcap_file.name else (68.0 if "weak-cipher" in pcap_file.name else 75.0),
-                        grade="Grade D" if "stripped" in pcap_file.name else "Grade C",
-                        ci_range=[44.0, 69.0] if "stripped" in pcap_file.name else [60.0, 76.0],
-                    )
+    # Bundled corpus scenarios, so the picker and the demo path work without
+    # requiring an upload first. These are NOT analysed yet, so score/grade/
+    # report_hash stay None rather than being invented.
+    try:
+        for cap in sorted(CORPUS_DIR.glob("*.pcap*")):
+            if not cap.is_file():
+                continue
+            sid = f"corpus:{cap.stem}"
+            if sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            summaries.append(
+                SessionSummary(
+                    id=sid,
+                    source_file=cap.name,
+                    started_at=_corpus_started_at(cap),
+                    package_ver=PACKAGE_VER,
+                    capture_sha256=_corpus_digest(cap),
                 )
+            )
+    except OSError:
+        pass
 
     return summaries
+
+@router.post("/sample/{sample_name}")
+def ingest_sample_capture(sample_name: str = "stripped"):
+    filename_map = {
+        "stripped": "stripped.pcap",
+        "sweet32": "weak-cipher.pcap",
+        "weak-cipher": "weak-cipher.pcap",
+        "weak-key": "weak-key.pcap",
+        "no-tls": "no-tls.pcap",
+        "unused": "advertised-unused.pcap",
+        "advertised-unused": "advertised-unused.pcap",
+    }
+    target_filename = filename_map.get(sample_name.lower(), "stripped.pcap")
+    target_path = CORPUS_DIR / target_filename
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"Corpus sample '{target_filename}' not found.")
+
+    session_id = f"sample-{sample_name.lower()}-{uuid.uuid4().hex[:6]}"
+    content = target_path.read_bytes()
+
+    flows, warnings = parse_capture(target_path, session_id)
+    findings, subscores = evaluate_rules(flows, session_id)
+    radar_findings, _ = compute_radar(flows, session_id)
+    all_findings = findings + radar_findings
+
+    if not flows:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No mail flows (SMTP/IMAP/POP3) were found in '{target_filename}'.",
+        )
+    mx_host = flows[0].mx_domain
+    posture = compute_posture(mx_host, subscores, all_findings)
+
+    # Store in memory cache
+    FINDINGS_CACHE[session_id] = all_findings
+    MX_CACHE[session_id] = [posture]
+    FLOW_CACHE[session_id] = flows
+    session_data = {
+        "id": session_id,
+        "source_file": target_filename,
+        "filename": target_filename,
+        "started_at": _corpus_started_at(target_path),
+        "flow_count": len(flows),
+        "findings_count": len(all_findings),
+        "package_ver": PACKAGE_VER,
+        "score": posture.index,
+        "grade": posture.grade,
+        "ci_range": [posture.ci_low, posture.ci_high],
+        "capture_sha256": hashlib.sha256(content).hexdigest(),
+        "path": str(target_path),
+    }
+    SESSION_CACHE[session_id] = session_data
+
+    # Persist to MongoDB Atlas
+    save_db_session(session_data)
+    save_db_findings(session_id, all_findings)
+    save_db_posture(session_id, [posture])
+
+    return {
+        "session_id": session_id,
+        "filename": target_filename,
+        "flow_count": len(flows),
+        "findings_count": len(all_findings),
+        "score": posture.index,
+        "grade": posture.grade,
+        "ci_range": [posture.ci_low, posture.ci_high],
+        "warnings": warnings,
+        "capture_sha256": hashlib.sha256(content).hexdigest(),
+    }
 
 @router.get("/{id}/status", response_model=PipelineStatus)
 def get_session_status(id: str):
@@ -137,24 +239,30 @@ def upload_capture(file: UploadFile = File(...)):
     radar_findings, _ = compute_radar(flows, session_id)
     all_findings = findings + radar_findings
 
-    mx_host = flows[0].server_ip if flows else "mail.inbound.net"
+    if not flows:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No mail flows (SMTP/IMAP/POP3) were found in {file.filename!r}.",
+        )
+    mx_host = flows[0].mx_domain
     posture = compute_posture(mx_host, subscores, all_findings)
 
     # Store in memory cache
     FINDINGS_CACHE[session_id] = all_findings
     MX_CACHE[session_id] = [posture]
+    FLOW_CACHE[session_id] = flows
     session_data = {
         "id": session_id,
         "source_file": file.filename,
         "filename": file.filename,
-        "started_at": "2026-09-29 14:00:00 UTC",
+        "started_at": _corpus_started_at(temp_path),
         "flow_count": len(flows),
         "findings_count": len(all_findings),
         "package_ver": PACKAGE_VER,
         "score": posture.index,
         "grade": posture.grade,
         "ci_range": [posture.ci_low, posture.ci_high],
-        "report_hash": f"sha256:{hashlib.sha256(content).hexdigest()}",
+        "capture_sha256": hashlib.sha256(content).hexdigest(),
         "path": str(temp_path),
     }
     SESSION_CACHE[session_id] = session_data
@@ -173,5 +281,5 @@ def upload_capture(file: UploadFile = File(...)):
         "grade": posture.grade,
         "ci_range": [posture.ci_low, posture.ci_high],
         "warnings": warnings,
-        "report_hash": f"sha256:{hashlib.sha256(content).hexdigest()}",
+        "capture_sha256": hashlib.sha256(content).hexdigest(),
     }

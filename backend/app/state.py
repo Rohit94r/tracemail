@@ -9,3 +9,5 @@ from typing import Dict, Any, List
 SESSION_CACHE: Dict[str, Dict[str, Any]] = {}
 FINDINGS_CACHE: Dict[str, List[Any]] = {}
 MX_CACHE: Dict[str, List[Any]] = {}
+# Parsed FlowRecord objects per session, used to build real topology
+FLOW_CACHE: Dict[str, List[Any]] = {}

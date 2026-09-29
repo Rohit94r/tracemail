@@ -54,13 +54,25 @@ def compute_radar(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findin
                     confidence=posterior,
                     provenance=FindingProvenance(
                         flow_id=sample_flow.flow_id,
-                        packet_no=18,
-                        byte_offset=sample_flow.first_byte_offset or "0x00000000",
+                        packet_no=sample_flow.first_packet_no,
+                        byte_offset=(
+                            f"0x{sample_flow.packet_offsets[str(sample_flow.first_packet_no)]:08X}"
+                            if str(sample_flow.first_packet_no)
+                            in sample_flow.packet_offsets
+                            else "unavailable"
+                        ),
                         tls_record_idx=0,
-                        timestamp="2026-09-29 12:00:00 UTC",
+                        timestamp=(
+                            sample_flow.packet_timestamps.get(
+                                str(sample_flow.first_packet_no)
+                            )
+                            or sample_flow.first_packet_timestamp
+                        ),
                         span_hash=f"sha256:radar_{mx.replace('.', '_')}",
                         hex_snippet=sample_flow.sample_payload_hex or "",
                         ascii_snippet=sample_flow.sample_payload_ascii or "",
+                        byte_offset_exact=str(sample_flow.first_packet_no)
+                        in sample_flow.packet_offsets,
                     ),
                 )
             )

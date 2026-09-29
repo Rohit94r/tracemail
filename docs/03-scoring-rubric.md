@@ -57,6 +57,7 @@ Each `subᵢ` is a **fraction deducting only for ruled findings**: start at 1.0,
 | `SMS-ENF-002` | stripped: STARTTLS → plaintext continues | high | CWE-757 | — |
 | `SMS-ENF-003` | 454/"Must issue" per session with >N repeats | medium | CWE-319 | — |
 | `SMS-ENF-004` | violation: MTA-STS `enforce` but observed plaintext ratio > 1% | high | CWE-319 | — |
+| `SMS-ENF-005` | implicit-TLS port (465/993/995) served in cleartext, incl. cleartext credentials (RFC 8314 §3) | high | CWE-319 | — |
 | `SMS-RADAR-001` | P(strip) > 0.5 on any MX | high | CWE-757 | — |
 | `SMS-RADAR-002` | observed cert ≠ CT-published hash (span includes pin-match) | critical | CWE-295 | — |
 | `SMS-RADAR-003` | JA3S multiplicity >1 for same MX | low | CWE-757 | — |

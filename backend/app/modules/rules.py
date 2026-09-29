@@ -29,6 +29,44 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
 
         prov_hash = hashlib.sha256(f"{flow.flow_id}:{flow.first_byte_offset}".encode()).hexdigest()
 
+        def evidence(*anchors: str) -> FindingProvenance:
+            """
+            Build provenance from the real packet that anchors the evidence.
+
+            `anchors` are ordered event names; the first one actually observed
+            in this flow wins. Packet number, byte offset and timestamp all come
+            from the same packet, so the triple is internally consistent and can
+            be checked against the capture file. When the exact byte offset is
+            not known it is reported as unavailable rather than guessed.
+            """
+            pkt = None
+            for name in anchors:
+                pkt = (
+                    flow.starttls_packets.get(name)
+                    or flow.tls_record_packets.get(name)
+                )
+                if pkt:
+                    break
+            if not pkt:
+                pkt = flow.first_packet_no
+            off = flow.packet_offsets.get(str(pkt))
+            return FindingProvenance(
+                flow_id=flow.flow_id,
+                packet_no=pkt,
+                byte_offset=(
+                    f"0x{off:08X}" if off is not None else "unavailable"
+                ),
+                tls_record_idx=0,
+                timestamp=(
+                    flow.packet_timestamps.get(str(pkt))
+                    or flow.first_packet_timestamp
+                ),
+                span_hash=f"sha256:{prov_hash}",
+                hex_snippet=flow.sample_payload_hex or "",
+                ascii_snippet=flow.sample_payload_ascii or "",
+                byte_offset_exact=off is not None,
+            )
+
         # Rule 1: SMS-ENF-002: Active STARTTLS Stripping / Cleartext Fallback
         if flow.starttls_category == "stripped":
             findings.append(
@@ -45,16 +83,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                     cvss=8.7,
                     cwe="CWE-757 (Selection of Less-Secure Algorithm During Negotiation)",
                     confidence=0.98,
-                    provenance=FindingProvenance(
-                        flow_id=flow.flow_id,
-                        packet_no=14,
-                        byte_offset=flow.first_byte_offset or "0x00000000",
-                        tls_record_idx=0,
-                        timestamp="2026-09-29 12:00:00 UTC",
-                        span_hash=f"sha256:{prov_hash}",
-                        hex_snippet=flow.sample_payload_hex or "",
-                        ascii_snippet=flow.sample_payload_ascii or "",
-                    ),
+                    provenance=evidence("refused", "cleartext_after", "starttls_cmd", "advertise"),
                 )
             )
             mx_deductions[mx]["enforce"] += 0.50
@@ -76,16 +105,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                     cvss=5.3,
                     cwe="CWE-319 (Cleartext Transmission of Sensitive Information)",
                     confidence=0.90,
-                    provenance=FindingProvenance(
-                        flow_id=flow.flow_id,
-                        packet_no=8,
-                        byte_offset=flow.first_byte_offset or "0x00000000",
-                        tls_record_idx=0,
-                        timestamp="2026-09-29 12:00:00 UTC",
-                        span_hash=f"sha256:{prov_hash}",
-                        hex_snippet=flow.sample_payload_hex or "",
-                        ascii_snippet=flow.sample_payload_ascii or "",
-                    ),
+                    provenance=evidence("starttls_cmd", "advertise", "cleartext_after"),
                 )
             )
             mx_deductions[mx]["enforce"] += 0.30
@@ -107,16 +127,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                         cvss=5.9,
                         cwe="CWE-326 (Inadequate Encryption Strength)",
                         confidence=0.95,
-                        provenance=FindingProvenance(
-                            flow_id=flow.flow_id,
-                            packet_no=12,
-                            byte_offset=flow.first_byte_offset or "0x00000000",
-                            tls_record_idx=1,
-                            timestamp="2026-09-29 12:00:00 UTC",
-                            span_hash=f"sha256:{prov_hash}",
-                            hex_snippet=flow.sample_payload_hex or "",
-                            ascii_snippet=flow.sample_payload_ascii or "",
-                        ),
+                        provenance=evidence("server_hello", "handshake"),
                     )
                 )
                 mx_deductions[mx]["cipher"] += 0.40
@@ -137,16 +148,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                         cvss=7.5,
                         cwe="CWE-327 (Use of a Broken or Risky Cryptographic Algorithm)",
                         confidence=0.99,
-                        provenance=FindingProvenance(
-                            flow_id=flow.flow_id,
-                            packet_no=10,
-                            byte_offset=flow.first_byte_offset or "0x00000000",
-                            tls_record_idx=1,
-                            timestamp="2026-09-29 12:00:00 UTC",
-                            span_hash=f"sha256:{prov_hash}",
-                            hex_snippet=flow.sample_payload_hex or "",
-                            ascii_snippet=flow.sample_payload_ascii or "",
-                        ),
+                        provenance=evidence("server_hello", "handshake"),
                     )
                 )
                 mx_deductions[mx]["cipher"] += 0.50
@@ -167,16 +169,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                         cvss=8.7,
                         cwe="CWE-326 (Inadequate Encryption Strength)",
                         confidence=1.0,
-                        provenance=FindingProvenance(
-                            flow_id=flow.flow_id,
-                            packet_no=6,
-                            byte_offset=flow.first_byte_offset or "0x00000000",
-                            tls_record_idx=0,
-                            timestamp="2026-09-29 12:00:00 UTC",
-                            span_hash=f"sha256:{prov_hash}",
-                            hex_snippet=flow.sample_payload_hex or "",
-                            ascii_snippet=flow.sample_payload_ascii or "",
-                        ),
+                        provenance=evidence("advertise", "refused"),
                     )
                 )
                 mx_deductions[mx]["protocol"] += 0.50
@@ -197,16 +190,7 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                     cvss=7.5,
                     cwe="CWE-326 (Inadequate Encryption Strength)",
                     confidence=0.98,
-                    provenance=FindingProvenance(
-                        flow_id=flow.flow_id,
-                        packet_no=15,
-                        byte_offset=flow.first_byte_offset or "0x00000000",
-                        tls_record_idx=2,
-                        timestamp="2026-09-29 12:00:00 UTC",
-                        span_hash=f"sha256:{prov_hash}",
-                        hex_snippet=flow.sample_payload_hex or "",
-                        ascii_snippet=flow.sample_payload_ascii or "",
-                    ),
+                    provenance=evidence("certificate", "server_hello", "handshake"),
                 )
             )
             mx_deductions[mx]["key"] += 0.50
@@ -218,24 +202,26 @@ def evaluate_rules(flows: List[FlowRecord], session_id: str) -> Tuple[List[Findi
                     session_id=session_id,
                     flow_id=flow.flow_id,
                     module="rules",
-                    rule_id="SMS-ENF-002",
+                    rule_id="SMS-ENF-005",
                     title="Implicit TLS Port Operating in Plaintext",
-                    summary=f"Service on port {flow.server_port} expected implicit TLS but received unencrypted commands.",
+                    summary=(
+                        f"Service on port {flow.server_port} is defined to require a "
+                        "direct TLS handshake, but the session ran in cleartext"
+                        + (
+                            " with credentials transmitted unprotected."
+                            if flow.starttls_packets.get("cleartext_secret")
+                            else "."
+                        )
+                    ),
                     clause="RFC 8314 §3: Mail ports 465/993/995 mandate direct TLS handshake.",
                     state="VULNERABLE",
                     severity="high",
                     cvss=8.7,
                     cwe="CWE-319 (Cleartext Transmission of Sensitive Information)",
                     confidence=1.0,
-                    provenance=FindingProvenance(
-                        flow_id=flow.flow_id,
-                        packet_no=4,
-                        byte_offset=flow.first_byte_offset or "0x00000000",
-                        tls_record_idx=0,
-                        timestamp="2026-09-29 12:00:00 UTC",
-                        span_hash=f"sha256:{prov_hash}",
-                        hex_snippet=flow.sample_payload_hex or "",
-                        ascii_snippet=flow.sample_payload_ascii or "",
+                    provenance=evidence(
+                        "cleartext_secret", "cleartext_command",
+                        "refused", "advertise",
                     ),
                 )
             )
