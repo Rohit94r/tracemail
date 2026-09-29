@@ -74,9 +74,9 @@ Three demo videos reviewed + 15 public repos scanned. **Every "claimed" row is s
 | 3 | Detect **policy-vs-reality** violation (MTA-STS/DANE vs observed) | ✅ IN | P3-3 |
 | 4 | **CI-banded** score + **published** rubric | ✅ IN | P1-4 (score), D4 |
 | 5 | **Reproducible** score (identical SHA-256 on re-run) | ✅ IN | P3-6 (`make verify`) |
-| 6 | **Incident Replay** (animated forensic timeline) | 🟡 PART — stretch | P5-1 |
-| 7 | **Grounded RAG chat** over findings | 🟡 PART — stretch | P5-2 |
-| 8 | **Attack Lens** (forecast next attack) | 🟡 PART — stretch | P5-3 |
+| 6 | **Incident Replay** (animated forensic timeline) | ✅ IN — **promoted to MVP** | P3-7 |
+| 7 | **Grounded RAG chat** over findings | 🟡 PART — stretch (needs local LLM) | P5-2 |
+| 8 | **Attack Lens** (forecast next attack) | ✅ IN — **promoted to MVP** | P3-8 |
 | 9 | **Tamper-proof manifest** + chain verify UI | 🟡 PART — base in P1-5, manifest/UI in P5-4 | P1-5 / P5-4 |
 | 10 | **Stay-ahead hardening** (PQC, rotation, calendar) | 🟡 PART — static playbook in P4, full in P5 | P4-2 |
 | 11 | **CT-vs-observed** cert drift (full CT oracle) | 🟡 PART — signal only | P3-2 (signal) |

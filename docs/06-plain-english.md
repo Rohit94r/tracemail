@@ -74,4 +74,4 @@ Today, that system fails in three real ways:
 - ~41,000 servers were caught actively unsealing email (real-world study).
 - Only ~1% of domains enforce modern sealing policies, ~4% use the strongest identity-pinning standard.
 
-*Source: peer-reviewed security research (USENIX, IMC, CCS, NDSS) — full list in `SIH26159-SecureMailScope-Research.md`.*
+*Source: peer-reviewed security research (USENIX, IMC, CCS, NDSS) — full list in `../SIH26159-SecureMailScope-Research.md`.*
